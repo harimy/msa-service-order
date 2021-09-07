@@ -9,8 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class OrderProductDto {
 
-    private Long productId;            // 주문한 상품번호
-    private String productName;        // 주문한 상품명
+    private Long id;            // 주문한 상품번호
+    private String name;        // 주문한 상품명
     private int orderPrice;     // 주문 가격(상품 가격 * 주문 개수)
     private int count;          // 주문 개수
 }

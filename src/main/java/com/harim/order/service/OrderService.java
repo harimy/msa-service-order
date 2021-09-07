@@ -79,18 +79,25 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(RuntimeException::new);
 
-        List<OrderProductDto> orderProducts = new ArrayList<>();
+        List<OrderProductDto> orderProductsList = new ArrayList<>();
         for(OrderProduct orderProduct : order.getOrderProducts())
         {
+            // 상품명 조회
             String url = String.format("http://localhost:8080/api/product/%s", orderProduct.getProductId());
             ResponseEntity<OrderProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, OrderProductDto.class);
             OrderProductDto product = responseData.getBody();
-            orderProducts.add(product);
+
+            // 주문 가격 및 수량
+            product.setOrderPrice(orderProduct.getOrderPrice());
+            product.setCount(orderProduct.getCount());
+
+            // 리스트에 추가
+            orderProductsList.add(product);
         }
 
         return OrderResponseDto.builder()
                 .orderId(order.getId())
-                .orderProducts(orderProducts)
+                .orderProducts(orderProductsList)
                 .orderDate(order.getOrderDate())
                 .orderStatus(order.getStatus())
                 .build();
