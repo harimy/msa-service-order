@@ -1,13 +1,16 @@
+Server:
+  port: 8090
+
 Spring:
   datasource:
-    url: jdbc:h2:tcp://localhost/~/product
+    url: jdbc:h2:tcp://localhost/~/order
     username: sa
     password:
     driver-class-name: org.h2.Driver
 
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: create
     properties:
       hibernate:
         format_sql: true
