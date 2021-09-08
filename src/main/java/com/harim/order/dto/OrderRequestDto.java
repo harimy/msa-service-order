@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class OrderCreateDto {
+public class OrderRequestDto {
 
     private Long productId; // 상품 id
     private int count;      // 주문 개수

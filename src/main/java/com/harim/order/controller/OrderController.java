@@ -1,12 +1,11 @@
 package com.harim.order.controller;
 
-import com.harim.order.dto.OrderCreateDto;
-import com.harim.order.dto.OrderListResponseDto;
-import com.harim.order.dto.OrderProductResponseDto;
-import com.harim.order.dto.OrderResponseDto;
+import com.harim.order.dto.*;
 import com.harim.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import javax.validation.Valid;
 
 @RestController
 @RequiredArgsConstructor
@@ -16,9 +15,9 @@ public class OrderController {
 
 
     @PostMapping("order")
-    public OrderProductResponseDto createOrder(@RequestBody OrderCreateDto orderCreateDto)
+    public OrderProductResponseDto createOrder(@RequestBody OrderRequestDto orderRequestDto)
     {
-        return orderService.save(orderCreateDto);
+        return orderService.save(orderRequestDto);
     }
 
     @GetMapping("/order/{id}")
@@ -33,6 +32,16 @@ public class OrderController {
         return orderService.getOrders();
     }
 
+    @PutMapping("/order/{id}")
+    public OrderProductResponseDto changeOrder(@PathVariable("id") Long id, @RequestBody @Valid OrderRequestDto orderRequestDto)
+    {
+        return orderService.changeOrder(id, orderRequestDto);
+    }
 
+    @DeleteMapping("/order/{id}")
+    public ResponseDto deleteOrder(@PathVariable("id") Long id)
+    {
+        return orderService.deleteOrder(id);
+    }
 
 }

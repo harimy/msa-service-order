@@ -48,18 +48,5 @@ public class Order {
         return order;
     }
 
-    //== 비즈니스 로직 ==//
-    /**
-     * 주문 취소
-     */
-    /*
-    public void cancel()
-    {
-        this.setStatus(OrderStatus.CANCEL);
-        for (OrderProduct orderProduct : orderProducts)
-        {
-            orderProduct.cancel();
-        }
-    }
-     */
+
 }
