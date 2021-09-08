@@ -103,6 +103,41 @@ public class OrderService {
                 .build();
     }
 
+    public OrderListResponseDto getOrders()
+    {
+        List<Order> orders = orderRepository.findAll();
+        List<OrderResponseDto> ordersList = new ArrayList<>();  // 주문 리스트
+        for(int i=0; i<orders.size(); i++)
+        {
+            List<OrderProductDto> orderProductsList = new ArrayList<>();    // 주문 상품 리스트
+
+            for(OrderProduct orderProduct : orders.get(i).getOrderProducts())
+            {
+                // 상품명 조회
+                String url = String.format("http://localhost:8080/api/product/%s", orderProduct.getProductId());
+                ResponseEntity<OrderProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, OrderProductDto.class);
+                OrderProductDto product = responseData.getBody();
+
+                // 주문 가격 및 수량
+                product.setOrderPrice(orderProduct.getOrderPrice());
+                product.setCount(orderProduct.getCount());
+
+                // 주문 상품 리스트에 추가
+                orderProductsList.add(product);
+            }
+
+            OrderResponseDto orderResponseDto = new OrderResponseDto(orders.get(i).getId()
+                    , orderProductsList
+                    , orders.get(i).getOrderDate()
+                    , orders.get(i).getStatus());
+
+            ordersList.add(orderResponseDto);
+
+        }
+
+        return new OrderListResponseDto(ordersList);
+    }
+
     // 주문 수정
 
     // 주문 취소
