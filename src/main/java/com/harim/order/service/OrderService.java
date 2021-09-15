@@ -30,6 +30,9 @@ public class OrderService {
 
     private final RestTemplate restTemplate;
 
+    private static final String PRODUCT_SERVICE = "product-service";
+
+
     /**
      *
      * @param orderRequestDto 주문시 넘기는 정보 : 주문할 상품 이름, 개수
@@ -37,31 +40,26 @@ public class OrderService {
      */
     public OrderProductResponseDto save(OrderRequestDto orderRequestDto)
     {
-        // Rest Template 작업
-        String url = String.format("http://localhost:8080/api/product/%s", orderRequestDto.getProductId());
 
         try
         {
-            ResponseEntity<ProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, ProductDto.class);
-            ProductDto product = responseData.getBody();
+            ProductDto product = searchProductById(orderRequestDto.getProductId());
 
-            // 주문
+            if(product.getStockQuantity()-orderRequestDto.getCount()<0)
+                throw new StockQuantityException();
+
             OrderProduct orderProduct = OrderProduct.builder()
                     .productId(product.getId())
                     .orderPrice(orderRequestDto.getCount() * product.getPrice())
                     .count(orderRequestDto.getCount())
                     .build();
-            Order order = Order.createOrder(orderProduct);
-            orderProduct = orderProductRepository.save(orderProduct);
 
             // 재고 수정
-            String productUpdateUrl = String.format("http://localhost:8080/api/product/%s", orderRequestDto.getProductId());
+            renewStockQuantity(product, product.getStockQuantity(), -orderRequestDto.getCount()); // 재고 갱신 (현재 재고 - 주문수량)
 
-            if(product.getStockQuantity()-orderRequestDto.getCount()<0)
-                throw new StockQuantityException();
-            product.setStockQuantity(product.getStockQuantity()-orderRequestDto.getCount()); // 재고 갱신 (현재 재고 - 주문수량)
-            HttpEntity<ProductDto> requestUpdate = new HttpEntity<>(product);
-            restTemplate.exchange(productUpdateUrl, HttpMethod.PUT, requestUpdate, ProductDto.class);
+            // 주문
+            Order order = Order.createOrder(orderProduct);
+            orderProduct = orderProductRepository.save(orderProduct);
 
             // 주문 상품 정보
             OrderProductDto orderProductDto = new OrderProductDto(orderProduct.getProductId(), product.getName()
@@ -95,17 +93,14 @@ public class OrderService {
         List<OrderProductDto> orderProductsList = new ArrayList<>();
         for(OrderProduct orderProduct : order.getOrderProducts())
         {
-            // 상품명 조회
-            String url = String.format("http://localhost:8080/api/product/%s", orderProduct.getProductId());
-            ResponseEntity<OrderProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, OrderProductDto.class);
-            OrderProductDto product = responseData.getBody();
+            // 상품 조회
+            ProductDto product = searchProductById(orderProduct.getProductId());
 
-            // 주문 가격 및 수량
-            product.setOrderPrice(orderProduct.getOrderPrice());
-            product.setCount(orderProduct.getCount());
+            // dto 에 담기
+            OrderProductDto dto = new OrderProductDto(product.getId(), product.getName(), orderProduct.getOrderPrice(), orderProduct.getCount());
 
             // 리스트에 추가
-            orderProductsList.add(product);
+            orderProductsList.add(dto);
         }
 
         return OrderResponseDto.builder()
@@ -130,17 +125,14 @@ public class OrderService {
 
             for(OrderProduct orderProduct : orders.get(i).getOrderProducts())
             {
-                // 상품명 조회
-                String url = String.format("http://localhost:8080/api/product/%s", orderProduct.getProductId());
-                ResponseEntity<OrderProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, OrderProductDto.class);
-                OrderProductDto product = responseData.getBody();
+                // 상품 조회
+                ProductDto product = searchProductById(orderProduct.getProductId());
 
-                // 주문 가격 및 수량
-                product.setOrderPrice(orderProduct.getOrderPrice());
-                product.setCount(orderProduct.getCount());
+                // dto 에 담기
+                OrderProductDto dto = new OrderProductDto(product.getId(), product.getName(), orderProduct.getOrderPrice(), orderProduct.getCount());
 
                 // 주문 상품 리스트에 추가
-                orderProductsList.add(product);
+                orderProductsList.add(dto);
             }
 
             OrderResponseDto orderResponseDto = new OrderResponseDto(orders.get(i).getId()
@@ -156,7 +148,7 @@ public class OrderService {
     }
 
     /**
-     *
+     * 주문 수정
      * @param orderProductId 주문 상품 아이디
      * @param orderRequestDto 변경할 주문 상품 내용
      * @return 변경된 주문 상품 정보
@@ -168,31 +160,22 @@ public class OrderService {
 
         try
         {
-            // 기존 재고 원복
-            String url = String.format("http://localhost:8080/api/product/%s", orderProduct.getProductId());
-            ResponseEntity<ProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, ProductDto.class);
-            ProductDto product = responseData.getBody();
+            // 기존 주문 취소
+            ProductDto product = searchProductById(orderProduct.getProductId());
 
+            // 새 주문양이 재고를 초과할 시 예외 발생
             if(product.getStockQuantity()+orderProduct.getCount()-orderRequestDto.getCount()<0)
                 throw new StockQuantityException();
-            product.setStockQuantity(product.getStockQuantity()+orderProduct.getCount()); // 재고 갱신 (현재 재고 + 기존 주문 수량)
-            HttpEntity<ProductDto> requestUpdate = new HttpEntity<>(product);
-            restTemplate.exchange(url, HttpMethod.PUT, requestUpdate, ProductDto.class);
 
-            // 주문
-            url = String.format("http://localhost:8080/api/product/%s", orderRequestDto.getProductId());
-            responseData = restTemplate.exchange(url, HttpMethod.GET, null, ProductDto.class);
-            product = responseData.getBody();
+            renewStockQuantity(product, product.getStockQuantity(), orderProduct.getCount()); // 재고 갱신 (현재 재고 + 기존 주문 수량)
+
+            // 주문 수정 : 변경된 주문의 재고 반영
+            product = searchProductById(orderRequestDto.getProductId());
+            renewStockQuantity(product, product.getStockQuantity(), -orderRequestDto.getCount()); // 재고 갱신 (현재 재고 - 새 주문 수량)
 
             orderProduct.setProductId(product.getId());
             orderProduct.setOrderPrice(product.getPrice() * orderRequestDto.getCount());
             orderProduct.setCount(orderRequestDto.getCount());
-
-            // 변경된 주문의 재고 반영
-
-            product.setStockQuantity(product.getStockQuantity()-orderRequestDto.getCount());    // 재고 갱신 (현재 재고 - 새 주문 수량)
-            requestUpdate = new HttpEntity<>(product);
-            restTemplate.exchange(url, HttpMethod.PUT, requestUpdate, ProductDto.class);
 
             return OrderProductResponseDto.builder()
                     .id(orderProduct.getId())
@@ -217,21 +200,35 @@ public class OrderService {
 
         for (OrderProduct orderProduct : order.getOrderProducts())
         {
-            // 재고 원복
-            String url = String.format("http://localhost:8080/api/product/%s", orderProduct.getProductId());
-            ResponseEntity<ProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, ProductDto.class);
-            ProductDto product = responseData.getBody();
-
-            product.setStockQuantity(product.getStockQuantity() + orderProduct.getCount()); // 재고 갱신 (현재 재고 + 기존 주문 수량)
-            HttpEntity<ProductDto> requestUpdate = new HttpEntity<>(product);
-            restTemplate.exchange(url, HttpMethod.PUT, requestUpdate, ProductDto.class);
+            ProductDto product = searchProductById(orderProduct.getProductId());
+            renewStockQuantity(product, product.getStockQuantity(), orderProduct.getCount());
 
             orderProductRepository.delete(orderProduct);
-
         }
 
         orderRepository.delete(order);
 
         return new ResponseDto("주문이 정상적으로 취소되었습니다.(주문번호: " + id + ")");
     }
+
+    // 중복 코드를 줄이기 위한 메소드 추출
+    // 상품 조회 메소드
+    private ProductDto searchProductById(Long productId)
+    {
+        String url = String.format("http://" + PRODUCT_SERVICE + "/api/product/%s", productId);
+        ResponseEntity<ProductDto> responseData = restTemplate.exchange(url, HttpMethod.GET, null, ProductDto.class);
+        ProductDto product = responseData.getBody();
+
+        return product;
+    }
+
+    // 재고 갱신 메소드
+    private void renewStockQuantity(ProductDto product, int original, int ordered)
+    {
+        String url = String.format("http://" + PRODUCT_SERVICE + "/api/product/%s", product.getId());
+        product.setStockQuantity(original+ordered);
+        HttpEntity<ProductDto> requestUpdate = new HttpEntity<>(product);
+        restTemplate.exchange(url, HttpMethod.PUT, requestUpdate, ProductDto.class);
+    }
+    
 }
