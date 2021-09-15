@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ProductDto<T> {
+public class ProductDto {
 
     private Long id;            // 상품 번호
     private String name;        // 상품명
